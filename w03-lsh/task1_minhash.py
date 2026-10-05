@@ -27,10 +27,13 @@ BOOK = [[1, 0, 0, 1],
 # The two hash functions the textbook uses on the row numbers.
 BOOK_HASHES = [lambda r: (r + 1) % 5, lambda r: (3 * r + 1) % 5]
 
+INF = float("inf")   # the textbook's ∞ - the signature value before any row hit
+
 
 def jaccard(a, b):
     """|a and b| / |a or b|. Empty union is 0, not an error."""
-    raise NotImplementedError("jaccard similarity")
+    union = len(a | b)
+    return len(a & b) / union if union else 0
 
 
 def minhash_signatures(columns, hashes, n_rows):
@@ -47,8 +50,74 @@ def minhash_signatures(columns, hashes, n_rows):
     Doing it that way is the point. If you sort or re-scan per column you have
     written something correct that does not survive a dataset that does not fit
     in memory, and not fitting in memory is what this course is about.
+
+    R2 - how this is one pass over the rows
+    ----------------------------------------
+    The input arrives column-major (a set of row numbers per column), so the
+    first thing done is one linear pass over the 1s that turns it row-major:
+    `rows[r]` is the list of columns that have a 1 in row r - i.e. row r of the
+    characteristic matrix, stored sparsely. That costs one visit per 1 and no
+    sorting. After that every row r is visited exactly once, in order: compute
+    h_1(r)..h_n(r) once, then push those n values into the signature of each
+    column listed in `rows[r]`. Nothing is ever re-read.
+
+    In a genuinely streamed matrix the rows would arrive already row-major and
+    the transposition step disappears; the loop over rows is the algorithm.
     """
-    raise NotImplementedError("signature matrix")
+    n_hash = len(hashes)
+    sig = [[INF] * n_hash for _ in columns]
+
+    # one pass over the 1s: column-major in, row-major out
+    rows = [[] for _ in range(n_rows)]
+    for c, col in enumerate(columns):
+        for r in col:
+            rows[r].append(c)
+
+    # one pass over the rows
+    for r in range(n_rows):
+        cols = rows[r]
+        if not cols:
+            continue                         # a row of zeros changes nothing
+        hv = [h(r) for h in hashes]          # h_i(r), computed once per row
+        for c in cols:                       # every column with a 1 in row r
+            sig[c] = list(map(min, sig[c], hv))
+    return sig
+
+
+def band_ranges(n, bands):
+    """Split signature positions 0..n-1 into `bands` contiguous slices.
+
+    R5 - what happens when `bands` does not divide n
+    ------------------------------------------------
+    Decision: **nothing is dropped and no band is empty**. The n % bands
+    leftover rows are handed one each to the first n % bands bands, so band
+    sizes differ by at most one (the same rule as numpy.array_split).
+
+        n=10, bands=3  ->  rows [0:4] [4:7] [7:10]   (r = 4, 3, 3)
+
+    Why not drop the remainder: every signature position cost a hash
+    evaluation over the whole matrix; throwing rows away wastes that work and
+    silently changes the S-curve the caller computed for n hashes.
+    Why not one long last band: a band of r+k rows is far *stricter* than the
+    others (s^(r+k)), which is a worse distortion than one row here or there.
+    Cost of this choice: the bands are no longer identical, so the S-curve is a
+    mix - the shorter bands (r rows) are the permissive ones and set the
+    effective step, which sits between (1/b)^(1/(r+1)) and (1/b)^(1/r).
+
+    Asking for more bands than there are rows is an error, not a guess.
+    """
+    if bands < 1:
+        raise ValueError("bands must be at least 1")
+    base, extra = divmod(n, bands)
+    if base == 0:
+        raise ValueError(f"{bands} bands for a signature of {n} rows: "
+                         "at least one band would be empty")
+    ranges, start = [], 0
+    for b in range(bands):
+        r = base + (1 if b < extra else 0)
+        ranges.append((start, start + r))
+        start += r
+    return ranges
 
 
 def lsh_candidates(signatures, bands):
@@ -58,9 +127,32 @@ def lsh_candidates(signatures, bands):
     one** band. Return {(i, j), ...} with i < j.
 
     The signature length must divide evenly by `bands`, or you have to decide
-    what to do with the remainder. Say what you decided.
+    what to do with the remainder. Say what you decided.  -> see band_ranges()
+
+    Each band gets its own bucket table, so a collision in band 1 can never be
+    confused with a collision in band 2 (§3.4.1). The bucket table is a dict
+    keyed by the band's tuple of values: Python hashes the tuple for us, and a
+    dict has as many buckets as it needs, so two different band vectors never
+    share a bucket by accident - the "large number of buckets" assumption of
+    the textbook, made exact.
     """
-    raise NotImplementedError("LSH candidate pairs")
+    if not signatures:
+        return set()
+    n = len(signatures[0])
+    cands = set()
+    for lo, hi in band_ranges(n, bands):
+        buckets = {}
+        for c, sig in enumerate(signatures):
+            buckets.setdefault(tuple(sig[lo:hi]), []).append(c)
+        for members in buckets.values():
+            if len(members) < 2:
+                continue
+            # members were appended in increasing column order, so i < j holds
+            for x in range(len(members)):
+                mi = members[x]
+                for y in range(x + 1, len(members)):
+                    cands.add((mi, members[y]))
+    return cands
 
 
 # ------------------------------------------------------------------- harness
