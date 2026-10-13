@@ -51,6 +51,9 @@ def exact_distinct(n):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--sizes", default="100000,400000,1600000")
+    p.add_argument("--exact-only", action="store_true",
+                   help="skip FM, to push the exact set further than FM's "
+                        "linear time is worth waiting for")
     a = p.parse_args()
     os.makedirs(OUT, exist_ok=True)
 
@@ -65,7 +68,7 @@ def main():
         row = {"n": n, "true_distinct": true, "exact_s": t_exact,
                "exact_peak_bytes": m_exact}
 
-        if flajolet_martin is not None:
+        if flajolet_martin is not None and not a.exact_only:
             try:
                 tracemalloc.start()
                 t0 = time.perf_counter()

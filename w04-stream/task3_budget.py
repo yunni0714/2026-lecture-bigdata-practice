@@ -17,7 +17,9 @@ The whole point of this structure is that "no" means no. A filter that gets a
 better score by occasionally forgetting something it was given has not improved
 anything, it has broken the contract.
 """
-import hashlib
+import hashlib, math
+
+from task1_sketches import BloomFilter
 
 
 class NaiveFilter:
@@ -43,7 +45,7 @@ class NaiveFilter:
         return self.n_bits
 
 
-class YourFilter:
+class YourFilter(BloomFilter):
     """Your filter.
 
         __init__(n_bits, seed=246)
@@ -64,14 +66,11 @@ class YourFilter:
     observation.md asks.
     """
 
-    def __init__(self, n_bits, seed=246):
-        raise NotImplementedError("write your filter")
-
-    def add(self, item):
-        raise NotImplementedError
-
-    def __contains__(self, item):
-        raise NotImplementedError
+    def __init__(self, n_bits, seed=246, expected_n=8_000):
+        # d/dk of (1 - e^(-kn/m))^k is zero at k = (m/n) ln 2. bench.py puts
+        # 8,000 items in 80,000 bits: k = 10 ln 2 = 6.93 -> 7 hashes, not 1.
+        k = max(1, round(n_bits / expected_n * math.log(2)))
+        super().__init__(n_bits, k, seed)       # add / __contains__ from Task 1
 
     def memory_bits(self):
-        raise NotImplementedError
+        return len(self.bits) * 8               # the whole packed bit array

@@ -13,7 +13,7 @@ approximating.
 
     python3 task1_sketches.py --verify
 """
-import argparse, random
+import argparse, hashlib, math, random, statistics
 
 
 class BloomFilter:
@@ -28,13 +28,24 @@ class BloomFilter:
     """
 
     def __init__(self, m, k, seed=246):
-        raise NotImplementedError("write the Bloom filter")
+        self.m, self.k = m, k
+        self.key = str(seed).encode()
+        self.bits = bytearray((m + 7) // 8)    # m real bits, not m bytes
+
+    def _indexes(self, item):
+        # Two independent 64-bit hashes give all k (Kirsch-Mitzenmacher):
+        # g_i = h1 + i*h2 behaves like k independent hashes for the fp rate.
+        d = hashlib.blake2b(str(item).encode(), digest_size=16,
+                            key=self.key).digest()
+        h1, h2 = int.from_bytes(d[:8], "big"), int.from_bytes(d[8:], "big") | 1
+        return [(h1 + i * h2) % self.m for i in range(self.k)]
 
     def add(self, item):
-        raise NotImplementedError
+        for j in self._indexes(item):
+            self.bits[j >> 3] |= 1 << (j & 7)
 
     def __contains__(self, item):
-        raise NotImplementedError
+        return all(self.bits[j >> 3] >> (j & 7) & 1 for j in self._indexes(item))
 
     def expected_fp_rate(self, n_inserted):
         """The textbook's predicted false-positive rate after n insertions.
@@ -42,7 +53,7 @@ class BloomFilter:
         §4.4.2 derives it. Return the number, do not measure it - the harness
         measures separately and compares the two.
         """
-        raise NotImplementedError
+        return (1 - math.exp(-self.k * n_inserted / self.m)) ** self.k
 
 
 def flajolet_martin(stream, n_hashes=64, seed=246):
@@ -67,7 +78,35 @@ def flajolet_martin(stream, n_hashes=64, seed=246):
 
     Return your estimate as a float.
     """
-    raise NotImplementedError("write Flajolet-Martin")
+    salt = f"{seed}:".encode()
+    R = [0] * n_hashes                         # the only state: one max per hash
+    mask = [1] * n_hashes                      # the low R[i]+1 bits of hash i
+    for x in stream:
+        # one SHAKE digest of 4*n_hashes bytes = n_hashes independent 32-bit
+        # hashes, read in one go instead of computing n_hashes hashes in Python
+        d = hashlib.shake_128(salt + str(x).encode()).digest(4 * n_hashes)
+        # hash i is bytes 4i..4i+3, little-endian. Its lowest byte settles
+        # almost every case, and bytes iterate as cached small ints - no
+        # allocation, which is what keeps tracemalloc from taxing this loop
+        for i, low in enumerate(d[::4]):
+            if not low & mask[i]:
+                h = int.from_bytes(d[4 * i:4 * i + 4], "little")
+                if not h & mask[i]:            # more than R[i] trailing zeros
+                    R[i] = (h & -h).bit_length() - 1 if h else 32
+                    mask[i] = (2 << R[i]) - 1
+    return combine(R)
+
+
+def combine(R, group=16):
+    """Group and combine twice (§4.5.3) - but median inside the groups, then
+    the mean of the medians. The textbook's order (mean inside, median across)
+    lands 1.2-18x high with 64 hashes: 2^R has so heavy a tail that a group mean
+    is still owned by its luckiest hash. The median kills that tail, and
+    averaging four medians breaks the power-of-two steps a median is stuck on."""
+    ests = [2 ** r for r in R]
+    medians = [statistics.median(ests[i:i + group])
+               for i in range(0, len(ests), group)]
+    return float(statistics.mean(medians))
 
 
 def reservoir_sample(stream, k, seed=246):
@@ -78,7 +117,16 @@ def reservoir_sample(stream, k, seed=246):
 
     Return a list of k items (or fewer if the stream was shorter).
     """
-    raise NotImplementedError("write reservoir sampling")
+    rng = random.Random(seed)
+    sample = []
+    for i, x in enumerate(stream):             # i + 1 = items seen so far
+        if i < k:
+            sample.append(x)
+        else:
+            j = rng.randrange(i + 1)           # keep x with probability k/(i+1)
+            if j < k:
+                sample[j] = x                  # evicting a uniformly chosen slot
+    return sample
 
 
 # ------------------------------------------------------------------- harness
