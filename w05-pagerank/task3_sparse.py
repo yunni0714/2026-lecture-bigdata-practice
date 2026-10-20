@@ -86,10 +86,39 @@ class YourPageRank:
     """
 
     def __init__(self, beta=0.85, tol=1e-10, max_iter=100):
-        raise NotImplementedError("write your PageRank")
+        self.beta, self.tol, self.max_iter = beta, tol, max_iter
+        self._floats = 0
 
     def run(self, graph):
-        raise NotImplementedError
+        nodes = list(graph)
+        n = len(nodes)
+        index = {v: i for i, v in enumerate(nodes)}
+        # The adjacency list as integer indices: E ints, no floats.
+        # Out-degree is len(outs), so it is not stored separately either.
+        outs = [[index[w] for w in graph[v]] for v in nodes]
+        beta = self.beta
+
+        r = [1.0 / n] * n
+        for self.iterations in range(1, self.max_iter + 1):
+            nr = [0.0] * n              # r and nr: the only 2n floats held
+            leaked = 0.0
+            for j, targets in enumerate(outs):
+                if targets:
+                    share = r[j] / len(targets)
+                    for i in targets:
+                        nr[i] += share
+                else:
+                    leaked += r[j]
+            # teleport + dead-end mass: one scalar, added to every node
+            base = (beta * leaked + 1 - beta) / n
+            for i in range(n):
+                nr[i] = beta * nr[i] + base
+            delta = sum(abs(a - b) for a, b in zip(nr, r))
+            r = nr
+            if delta < self.tol:
+                break
+        self._floats = 2 * n
+        return {v: r[index[v]] for v in nodes}
 
     def memory_floats(self):
-        raise NotImplementedError
+        return self._floats

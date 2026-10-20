@@ -41,7 +41,40 @@ def pagerank(graph, beta=0.85, iterations=100, tol=1e-10):
     you should call it converged. Return the ranks, and set `pagerank.iterations`
     to how many you actually used, because Task 2 measures that.
     """
-    raise NotImplementedError("implement PageRank")
+    nodes = _nodes(graph)
+    n = len(nodes)
+    r = {v: 1.0 / n for v in nodes}
+    pagerank.iterations = 0
+    for it in range(1, iterations + 1):
+        nr = dict.fromkeys(nodes, 0.0)
+        leaked = 0.0
+        for v, outs in graph.items():
+            if outs:
+                share = r[v] / len(outs)
+                for w in outs:
+                    nr[w] += share
+            else:
+                leaked += r[v]          # dead end: nowhere to go
+        # Dead-end rank is sent to every node uniformly, as if the dead end
+        # linked to all n pages. The teleport adds (1 - beta)/n to each.
+        # Together they are the leftover 1 - beta*(rank that followed a link).
+        base = (beta * leaked + 1 - beta) / n
+        for v in nodes:
+            nr[v] = beta * nr[v] + base
+        delta = sum(abs(nr[v] - r[v]) for v in nodes)
+        r = nr
+        pagerank.iterations = it
+        if delta < tol:
+            break
+    return r
+
+
+def _nodes(graph):
+    """Every node, including ones that only ever appear as a link target."""
+    seen = dict.fromkeys(graph)
+    for outs in graph.values():
+        seen.update(dict.fromkeys(outs))
+    return list(seen)
 
 
 def pagerank_no_teleport(graph, iterations=100):
@@ -50,7 +83,15 @@ def pagerank_no_teleport(graph, iterations=100):
     It exists so you can watch both failures happen rather than take them on
     trust. The harness checks that it really does fail.
     """
-    raise NotImplementedError("implement the broken version")
+    nodes = _nodes(graph)
+    r = {v: 1.0 / len(nodes) for v in nodes}
+    for _ in range(iterations):
+        nr = dict.fromkeys(nodes, 0.0)
+        for v, outs in graph.items():
+            for w in outs:              # a dead end's rank is simply dropped
+                nr[w] += r[v] / len(outs)
+        r = nr
+    return r
 
 
 # ------------------------------------------------------------------- harness
