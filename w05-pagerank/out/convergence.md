@@ -66,6 +66,15 @@ High β also makes traps stronger. The 10 seed pages hold 34.5% of all rank at
 
 ## A4 · Graph size (tol 1e-10)
 
+Prediction from the theory:
+
+- **Iterations should not change with size.** The error is cut by a fixed rate
+  each step, and that rate comes from β and the shape of the graph, not from
+  the number of pages.
+- **Time should grow with the number of edges.** One step visits every edge once.
+
+Result: both held (table below). The surprise in this task was β (A3), not size.
+
 | nodes | edges | it. β=0.5 | it. β=0.85 | it. β=0.99 | seconds β=0.85 | ms per iteration |
 |---:|---:|---:|---:|---:|---:|---:|
 | 1,200 | 5,877 | 14 | 20 | 24 | 0.009 | 0.45 |
