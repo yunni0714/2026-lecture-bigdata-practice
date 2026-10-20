@@ -1,126 +1,86 @@
-# Task 2 · How long PageRank takes to converge
+# Task 2 · Convergence
 
-All numbers come from `python3 task2_convergence.py` on 2026-10-20, between
-13:25 and 13:29, in eight invocations. The raw rows are in `convergence.json`
-(28 runs). PageRank is Task 1's `pagerank`: uniform start, uniform teleport,
-dead-end rank spread over all n nodes, stop when the L1 change between two
-iterations drops below `tol`.
+I ran `python3 task2_convergence.py` on 2026-10-20 (13:25–13:29), 8 times with
+different options. All 28 rows are in `convergence.json`.
 
-One change to the script: a `--max-iter` flag (default still 500) and the cap
-recorded in each row, in case beta = 0.99 needed more than 500 iterations. It
-never did, and why it did not is most of A3.
+I added a `--max-iter` option (default is still 500) in case beta 0.99 needed
+more than 500 iterations. It never did.
 
-## A7 · The machine
+## A7 · Machine
 
 | | |
 |---|---|
-| CPU | Intel Core Ultra X7 358H, 16 cores / 16 threads (laptop), 18 MB L3 cache |
-| RAM | 31.4 GB, 10.8 GB free before the run |
-| OS / Python | Windows 11 Home 10.0.26200, CPython 3.14.7 |
-| Power | on AC power, battery at 86% |
-| Also running | Discord, Steam, Opera, the Claude desktop app. CPU load ~8% before the run |
-| Graph | `bench.build()`: power-law out-degrees, 12 dead ends, one planted 2-node trap |
+| CPU | Intel Core Ultra X7 358H, 16 cores (laptop) |
+| RAM | 31.4 GB (10.8 GB free) |
+| OS / Python | Windows 11, Python 3.14.7 |
+| Power | plugged in |
+| Other apps | Discord, Steam, Opera, Claude app (CPU ~8% before the run) |
 
-Times under 0.05 s are single runs and carry a few milliseconds of noise.
-Iteration counts are exact and do not depend on the machine.
+Times under 0.05 s are from one run, so they are a bit noisy.
+Iteration counts do not depend on the machine.
 
-## A1, A2 · Iterations against beta (1,200 nodes, tol 1e-10)
+## A1, A2 · Iterations vs beta (1,200 nodes, tol 1e-10)
 
-| beta | iterations | seconds | textbook bound ⌈ln tol / ln β⌉ | measured rate per iteration |
-|---:|---:|---:|---:|---:|
-| 0.50 | 14 | 0.006 | 34 | 0.183 = β × 0.366 |
-| 0.55 | 14 | 0.006 | 39 | |
-| 0.60 | 15 | 0.007 | 46 | |
-| 0.65 | 16 | 0.007 | 54 | |
-| 0.70 | 17 | 0.008 | 65 | 0.286 = β × 0.408 |
-| 0.75 | 18 | 0.009 | 81 | |
-| 0.80 | 19 | 0.008 | 104 | |
-| 0.85 | 20 | 0.009 | 142 | 0.373 = β × 0.439 |
-| 0.90 | 21 | 0.010 | 219 | |
-| 0.95 | 23 | 0.010 | 449 | 0.410 = β × 0.432 |
-| 0.99 | **24** | 0.011 | **2,292** | 0.428 = β × 0.432 |
-
-"Rate" is the ratio of two successive L1 changes once the iteration has
-settled, measured separately for five betas (snippet under A3).
-
-## A3 · The shape, and why
-
-**It barely grows: 14 iterations at 0.5, 24 at 0.99.** The textbook's bound,
-error ≤ β^k, says 34 and 2,292. On this graph the error shrinks by
-**β × 0.43** per iteration, not by β.
-
-The error after k iterations is e_k = β^k · M^k · e_0. Two things shrink it:
-β (each step keeps only a β share of the old distribution) and M itself.
-Where M has an eigenvalue of size 1, only β is left, and that is the β^k
-bound. This graph has two such places, both closed groups of pages (spider
-traps):
-
-- the planted trap p01198 ↔ p01199 (eigenvalues +1 and −1)
-- **the 10 seed nodes p00000–p00009**, which only link to each other. The
-  generator starts every link list from them, so they form a 10-node trap of
-  their own
-
-Neither slows anything down here, because **the start vector is the teleport
-vector** (both uniform). Then e_0 = u − r*, and its component along an
-eigenvector of M with eigenvalue λ is c · β(1 − λ)/(1 − βλ), which is **zero
-for λ = 1**. The −1 mode would make the two trap pages swing back and forth,
-but a uniform start gives them equal rank and nothing ever makes them
-unequal. What is left is the next eigenvalue, about 0.43: the graph is almost
-a DAG (only 26 of 5,877 edges point to a later page), so rank reaches the
-seeds within a few hops.
-
-**Check: start everything on p01199 instead.** Same graph, same betas:
-
-| beta | uniform start | all rank on p01199 | rate with that start |
+| beta | iterations | seconds | book bound (β^k ≤ tol) |
 |---:|---:|---:|---:|
-| 0.50 | 14 | 36 | 0.500 |
-| 0.70 | 17 | 68 | 0.700 |
-| 0.85 | 20 | 147 | 0.850 |
-| 0.95 | 23 | 464 | 0.950 |
-| 0.99 | 24 | **2,362** | 0.990 |
+| 0.50 | 14 | 0.006 | 34 |
+| 0.55 | 14 | 0.006 | 39 |
+| 0.60 | 15 | 0.007 | 46 |
+| 0.65 | 16 | 0.007 | 54 |
+| 0.70 | 17 | 0.008 | 65 |
+| 0.75 | 18 | 0.009 | 81 |
+| 0.80 | 19 | 0.008 | 104 |
+| 0.85 | 20 | 0.009 | 142 |
+| 0.90 | 21 | 0.010 | 219 |
+| 0.95 | 23 | 0.010 | 449 |
+| 0.99 | 24 | 0.011 | 2,292 |
 
-```python
-r = {v: 0.0 for v in g}; r["p01199"] = 1.0    # instead of 1/n each
-# then Task 1's update loop, unchanged, until the L1 change < 1e-10
-```
+## A3 · Shape
 
-Now the rate is exactly β, and the count follows ln(tol)/ln(β) ≈
-ln(1/tol)/(1 − β): **it blows up like 1/(1 − β) as β → 1.** The textbook is
-right about the worst case; the uniform start just never meets it on this
-graph. The real web has many groups that are *almost* closed (λ close to 1
-but not equal), and for those the factor β(1 − λ)/(1 − βλ) is not zero, so
-a beta near 1 does cost iterations there.
+The count grows very slowly: 14 at 0.5, 24 at 0.99.
+The book's bound says 34 and 2,292, so a big jump near 1 was possible. It did not happen.
 
-β → 1 also makes traps win. The 10-seed trap holds **34.5%** of all rank at
-0.5, **75.8%** at 0.85 and **98.1%** at 0.99. That, more than speed, is the
-case against a beta near 1.
+Why: here the error goes down by about **β × 0.43** each step, not by β.
+The slow part of PageRank comes from closed groups of pages (traps).
+This graph has two: the 10 seed pages (p00000–p00009 only link to each other)
+and the planted pair p01198/p01199.
+But my start vector is uniform, the same as the teleport vector, so these slow
+parts start at zero and never show up.
+
+Check: I started with all rank on p01199 instead. Then the error goes down by
+exactly β each step:
+
+| beta | uniform start | all rank on p01199 |
+|---:|---:|---:|
+| 0.50 | 14 | 36 |
+| 0.70 | 17 | 68 |
+| 0.85 | 20 | 147 |
+| 0.95 | 23 | 464 |
+| 0.99 | 24 | **2,362** |
+
+So the book is right about the worst case: as β → 1 the count grows like
+1/(1 − β). The uniform start just avoids it on this graph.
+
+High β also makes traps stronger. The 10 seed pages hold 34.5% of all rank at
+0.5, 75.8% at 0.85 and 98.1% at 0.99.
 
 ## A4 · Graph size (tol 1e-10)
 
-Expectation before running: the iteration count would not move, because the
-rate is set by β and the shape of the graph, not by how many pages it has;
-the time would grow with the edge count, because every iteration visits every
-edge once.
+| nodes | edges | it. β=0.5 | it. β=0.85 | it. β=0.99 | seconds β=0.85 | ms per iteration |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1,200 | 5,877 | 14 | 20 | 24 | 0.009 | 0.45 |
+| 6,000 | 30,433 | 14 | 22 | 25 | 0.051 | 2.32 |
+| 20,000 | 101,665 | 14 | 21 | 25 | 0.179 | 8.52 |
+| 100,000 | 509,332 | – | 20 | – | 1.117 | 55.9 |
 
-| nodes | × | edges | it. β=0.5 | it. β=0.85 | it. β=0.99 | seconds β=0.85 | ms / iteration | ns per (node + edge) |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1,200 | 1 | 5,877 | 14 | 20 | 24 | 0.009 | 0.45 | 64 |
-| 6,000 | 5 | 30,433 | 14 | 22 | 25 | 0.051 | 2.32 | 64 |
-| 20,000 | 16.7 | 101,665 | 14 | 21 | 25 | 0.179 | 8.52 | 70 |
-| 100,000 | 83 | 509,332 | – | 20 | – | 1.117 | 55.9 | 92 |
+- **Iterations: almost the same** (20–22 at β = 0.85) from 1,200 to 100,000 nodes.
+- **Time: grows with the edges.** 0.009 s → 1.12 s for 87× more edges.
 
-- **Iterations: flat** (20–22 at β = 0.85 over 83×). The count is how many
-  times the error has to be multiplied by ~0.37 to get under 1e-10. That is a
-  dimensionless number, and the bigger graphs have the same seed trap and the
-  same near-DAG shape, so the same rate.
-- **Time: linear in the edges.** 124× the time for 87× the edges. Per edge and
-  per iteration it is constant up to 20,000 nodes and 40% dearer at 100,000.
-  The likely cause (not measured) is that the graph and the two rank dicts,
-  tens of MB of Python objects at that size, no longer fit in the 18 MB L3
-  cache.
-
-They differ because one counts *multiplications* and the other the *cost of
-one multiplication*. Size only enters the second.
+They are different questions. The iteration count is how many times the error
+has to be cut down, and that depends on β and the shape of the graph, not its
+size. Size only changes how long one step takes, because one step visits every
+edge once. At 100,000 nodes one edge cost about 40% more per step, probably
+because the data no longer fits in the CPU cache (I did not check this).
 
 ## A5 · Tolerance (1,200 nodes)
 
@@ -132,37 +92,27 @@ one multiplication*. Size only enters the second.
 | 1e-10 | 20 | 24 |
 | 1e-12 | 25 | 29 |
 
-**Each extra digit costs a fixed number of iterations: 2.0 at β = 0.85 and
-2.4 at β = 0.99** (from 1e-4 to 1e-12). That is what geometric convergence
-means: the error is multiplied by the same rate every iteration, so one
-digit costs 1/log10(1/rate) iterations, 2.3 and 2.7 for the measured rates.
-The textbook bound would charge 14.2 and 229 per digit.
+Each extra digit costs about 2 iterations (2.0 at β = 0.85, 2.4 at β = 0.99).
+The cost per digit stays the same, because the error is cut by the same factor
+every step.
 
-`tol` bounds the change between two iterations, not the distance to the
-answer, which is about change × rate / (1 − rate). At rate 0.43 the two are
-close: stopping at 1e-10 with β = 0.99 left a true L1 error of 1.6e-11. At a
-rate of 0.99 the true error would be 99× the change, so the same `tol` would
-promise far less than it seems to.
+Note: `tol` is the change between two steps, not the real error. Here they are
+close: at β = 0.99, stopping at 1e-10 left a real error of 1.6e-11.
 
 ## A6 · Does the top 10 move?
 
-**The same ten pages at every beta and every size: the 10 seed nodes.** One
-change of order, and only one: p00000 and p00004 swap 7th and 8th place
-between β = 0.50 and 0.55. Bisecting the crossing puts it at **β = 0.5445**.
-Places 1–6 and 9–10 never change.
+The top 10 is **the same 10 pages** at every β and every size (the 10 seed pages).
+Only one change: p00000 and p00004 swap 7th and 8th place between β = 0.50 and
+0.55. The exact point is about β = 0.5445.
 
 | beta | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0.50 | p00009 | p00001 | p00006 | p00005 | p00003 | p00002 | **p00000** | **p00004** | p00007 | p00008 |
 | 0.55 – 0.99 | p00009 | p00001 | p00006 | p00005 | p00003 | p00002 | **p00004** | **p00000** | p00007 | p00008 |
 
-The top is stable because it *is* the trap: every link list started from
-these ten pages. Below the top β matters more. The planted 2-node trap is
-**98th** at β = 0.5, 39th at 0.85 and **12th** at 0.99. It does not gain
-rank (0.0017 at every beta: nothing links into it, so it lives on teleport
-alone); everyone else outside the seeds loses rank to the seed trap, and the
-small trap overtakes them.
+Lower in the list, β matters more. The planted trap pair is 98th at β = 0.5,
+39th at 0.85 and 12th at 0.99. Its own rank does not change (0.0017); it moves up
+because everyone else loses rank to the seed trap.
 
-So the head of the ranking can be trusted whoever chose β. The boundaries
-(7th vs 8th, who is 11th) and anything shaped like a trap are a consequence
-of the 0.85 somebody picked.
+So the top of a ranking is safe to trust. Close places (7th vs 8th, who is 11th)
+depend on whoever chose 0.85.
